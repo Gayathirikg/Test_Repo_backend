@@ -17,8 +17,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Security
-app.use(helmet());
-
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100
