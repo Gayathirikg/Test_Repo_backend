@@ -30,9 +30,9 @@ app.use(limiter);
 app.use(cors({
   origin: [ 
     process.env.FRONTEND_URL || "http://localhost:5173",
-      "https://test-repo-five-beta.vercel.app",
-
-    ],
+    "https://test-repo-five-beta.vercel.app",
+    /\.vercel\.app$/
+  ],
   credentials: true
 }));
 
