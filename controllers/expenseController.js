@@ -1,15 +1,12 @@
 import Expense from "../models/Expense.js";
-import fs from "fs/promises";
-import path from "path";
+import mongoose from "mongoose";
+import { cloudinary } from "../multerconfig.js";
 
 // ADD EXPENSE
-
-const BASE_URL = process.env.BASE_URL || "http://localhost:5001";
 export const addExpense = async (req, res) => {
   try {
     const { title, amount, category, date } = req.body;
 
-    // Validation
     if (!title || !amount || !category) {
       return res.json({ success: false, message: "All fields required" });
     }
@@ -17,8 +14,9 @@ export const addExpense = async (req, res) => {
       return res.json({ success: false, message: "Amount must be positive" });
     }
 
+    // 🆕 req.files.path = Cloudinary URL (automatic)
     const billImage = req.files
-      ? req.files.map((f) => `http://localhost:5001/uploads/${f.filename}`)
+      ? req.files.map((f) => f.path)
       : [];
 
     const expense = new Expense({
@@ -31,13 +29,13 @@ export const addExpense = async (req, res) => {
     });
 
     await expense.save();
-
     res.json({ success: true, message: "Expense Added", expense });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// GET EXPENSES
 export const getExpenses = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -46,7 +44,6 @@ export const getExpenses = async (req, res) => {
 
     const filter = { userId: req.user.id };
 
-    
     const isPremium1 = req.user.plan === "premium1" || req.user.plan === "premium2";
     const isPremium2 = req.user.plan === "premium2";
 
@@ -88,14 +85,9 @@ export const getExpenses = async (req, res) => {
     }
 
     const count = await Expense.countDocuments(filter);
-
-    const expenses = await Expense.find(filter)
-      .sort(sortOrder)
-      .limit(limit)
-      .skip(skip);
+    const expenses = await Expense.find(filter).sort(sortOrder).limit(limit).skip(skip);
 
     res.json({ success: true, expenses, count });
-
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -116,15 +108,14 @@ export const updateExpense = async (req, res) => {
     const updateData = { title, amount, category, date };
 
     if (req.files && req.files.length > 0) {
-      updateData.billImage = req.files.map(
-        (f) => `http://localhost:5001/uploads/${f.filename}`,
-      );
+      // 🆕 Cloudinary URL save பண்றோம்
+      updateData.billImage = req.files.map((f) => f.path);
     }
 
     const expense = await Expense.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       updateData,
-      { new: true },
+      { new: true }
     );
 
     if (!expense) {
@@ -144,31 +135,30 @@ export const deleteExpense = async (req, res) => {
       _id: req.params.id,
       userId: req.user.id,
     });
+
     if (!expense) {
       return res.json({ success: false, message: "Expense not found" });
     }
 
-    // console.log("-----------------------",expense.billImage)
-    const FileArray = expense.billImage;
-    // const filepath = expense.
-    for (let i = 0; i < expense.billImage.length; i++) {
-      const filename = FileArray[i].split("uploads/")[1];
-      console.log(filename);
-      // C:\Users\Gayathiri K G\Downloads\expensetracker\backend\uploads
-      const filePath = path.join("uploads", filename);
-      console.log("pathhhhhhhhhh---", filePath);
-
+    // 🆕 Cloudinary-ல் இருந்து images delete பண்றோம்
+    for (const imageUrl of expense.billImage) {
       try {
-        await fs.unlink(filePath);
-        console.log("Deleted:", filePath);
+        // URL-ல் இருந்து public_id எடுக்கோம்
+        // Example URL: https://res.cloudinary.com/cloud/image/upload/v123/expense-tracker/filename.jpg
+        const parts = imageUrl.split("/");
+        const filenameWithExt = parts[parts.length - 1];
+        const filename = filenameWithExt.split(".")[0];
+        const folderName = parts[parts.length - 2];
+        const publicId = `${folderName}/${filename}`;
+
+        await cloudinary.uploader.destroy(publicId);
+        console.log("Cloudinary deleted:", publicId);
       } catch (err) {
-        console.log("Error deleting file:", err);
+        console.log("Cloudinary delete error:", err.message);
       }
     }
-    await Expense.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+
+    await Expense.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
 
     res.json({ success: true, message: "Expense Deleted" });
   } catch (error) {
@@ -177,31 +167,26 @@ export const deleteExpense = async (req, res) => {
   }
 };
 
+// CATEGORY TOTALS
 export const getCategoryTotals = async (req, res) => {
   try {
-    const userId = req.user.id; 
+    const userId = req.user.id;
 
     const categoryTotals = await Expense.aggregate([
-      
       {
         $match: {
           userId: new mongoose.Types.ObjectId(userId),
         },
       },
-
       {
         $group: {
           _id: "$category",
           totalAmount: { $sum: "$amount" },
-          count: { $sum: 1 },         
-          avgAmount: { $avg: "$amount" } 
+          count: { $sum: 1 },
+          avgAmount: { $avg: "$amount" },
         },
       },
-
-      {
-        $sort: { totalAmount: -1 },
-      },
-
+      { $sort: { totalAmount: -1 } },
       {
         $project: {
           _id: 0,
@@ -220,7 +205,6 @@ export const getCategoryTotals = async (req, res) => {
       grandTotal,
       data: categoryTotals,
     });
-
   } catch (error) {
     console.log("getCategoryTotals error →", error);
     return res.status(500).json({ success: false, message: "Server error" });

@@ -32,11 +32,23 @@ const userSchema = new mongoose.Schema({
     enum: ["free", "premium1", "premium2"],
     default: "free",
   },
+
+  // Forgot password OTP
   resetOtp: {
     type: String,
     default: null,
   },
   resetOtpExpiry: {
+    type: Date,
+    default: null,
+  },
+
+  // Login OTP
+  loginOtp: {
+    type: String,
+    default: null,
+  },
+  loginOtpExpiry: {
     type: Date,
     default: null,
   },

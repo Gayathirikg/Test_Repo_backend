@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
@@ -22,6 +23,7 @@
     "mongodb": "^7.1.0",
     "mongoose": "^9.3.0",
     "multer": "^2.1.1",
+    "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^8.0.4"
   },
   "devDependencies": {
